@@ -28,11 +28,14 @@ import com.google.firebase.ml.common.modeldownload.FirebaseModelDownloadConditio
 import com.google.firebase.ml.common.modeldownload.FirebaseModelManager;
 import com.google.firebase.ml.common.modeldownload.FirebaseRemoteModel;
 import com.google.firebase.ml.common.modeldownload.FirebaseLocalModel;
+import com.google.firebase.ml.custom.FirebaseCustomLocalModel;
+import com.google.firebase.ml.custom.FirebaseCustomRemoteModel;
 import com.google.firebase.ml.custom.FirebaseModelDataType;
 import com.google.firebase.ml.custom.FirebaseModelInputOutputOptions;
 import com.google.firebase.ml.custom.FirebaseModelInputs;
 import com.google.firebase.ml.custom.FirebaseModelInterpreter;
-import com.google.firebase.ml.custom.FirebaseModelOptions;
+//import com.google.firebase.ml.custom.FirebaseModelOptions;
+import com.google.firebase.ml.custom.FirebaseModelInterpreterOptions;
 import com.google.firebase.ml.custom.FirebaseModelOutputs;
 
 import com.google.firebase.ml.naturallanguage.FirebaseNaturalLanguage;
@@ -60,6 +63,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +96,9 @@ public class MlkitPlugin implements MethodCallHandler {
     });
     private static Context context;
     private static Activity activity;
+
+    private HashMap<String, FirebaseCustomLocalModel> localModel = new HashMap<String, FirebaseCustomLocalModel>();
+    private HashMap<String, FirebaseCustomRemoteModel> remoteModel = new HashMap<String, FirebaseCustomRemoteModel>();
 
     /**
      * Plugin registration.
@@ -250,9 +257,9 @@ public class MlkitPlugin implements MethodCallHandler {
             if (call.argument("source") != null) {
                 Map<String, Object> sourceMap = call.argument("source");
                 String modelName = (String) sourceMap.get("modelName");
-                Boolean enableModelUpdates = (Boolean) sourceMap.get("enableModelUpdates");
-                FirebaseRemoteModel.Builder cloudSourceBuilder = new FirebaseRemoteModel.Builder(modelName);
-                cloudSourceBuilder.enableModelUpdates(enableModelUpdates);
+//                Boolean enableModelUpdates = (Boolean) sourceMap.get("enableModelUpdates");
+                FirebaseCustomRemoteModel cloudSource = new FirebaseCustomRemoteModel.Builder(modelName).build();
+//                cloudSource.enableModelUpdates(enableModelUpdates);
 
                 if (sourceMap.get("initialDownloadConditions") != null) {
                     Map<String, Boolean> conditionMap = (Map<String, Boolean>) sourceMap
@@ -267,7 +274,8 @@ public class MlkitPlugin implements MethodCallHandler {
                     if (conditionMap.get("requireCharging")) {
                         conditionsBuilder.requireCharging();
                     }
-                    cloudSourceBuilder.setInitialDownloadConditions(conditionsBuilder.build());
+
+                    manager.download(cloudSource, conditionsBuilder.build());
                 }
 
                 if (sourceMap.get("updatesDownloadConditions") != null) {
@@ -283,11 +291,10 @@ public class MlkitPlugin implements MethodCallHandler {
                     if (conditionMap.get("requireCharging")) {
                         conditionsBuilder.requireCharging();
                     }
-                    cloudSourceBuilder.setUpdatesDownloadConditions(conditionsBuilder.build());
+
+                    manager.download(cloudSource, conditionsBuilder.build());
+                    remoteModel.put(modelName, cloudSource);
                 }
-                FirebaseRemoteModel model = cloudSourceBuilder.build();
-                manager.registerRemoteModel(model);
-                manager.downloadRemoteModelIfNeeded(model);
 
             }
         } else if (call.method.equals("FirebaseModelManager#registerLocalModelSource")) {
@@ -297,11 +304,26 @@ public class MlkitPlugin implements MethodCallHandler {
                 Map<String, Object> sourceMap = call.argument("source");
                 String modelName = (String) sourceMap.get("modelName");
                 String assetFilePath = (String) sourceMap.get("assetFilePath");
-                FirebaseLocalModel localSource =
-                        new FirebaseLocalModel.Builder(modelName)
+                FirebaseCustomLocalModel localSource =
+                        new FirebaseCustomLocalModel.Builder()
                                 .setAssetFilePath("flutter_assets/"+assetFilePath)
                                 .build();
-                FirebaseModelManager.getInstance().registerLocalModel(localSource);
+                this.localModel.put(modelName, localSource);
+            }
+
+        } else if (call.method.equals("FirebaseModelManager#registerCustomLocalModelSource")) {
+            FirebaseModelManager manager = FirebaseModelManager.getInstance();
+
+            if (call.argument("source") != null) {
+                Map<String, Object> sourceMap = call.argument("source");
+                String modelName = (String) sourceMap.get("modelName");
+                String filePath = (String) sourceMap.get("filePath");
+                FirebaseCustomLocalModel localSource =
+                        new FirebaseCustomLocalModel.Builder()
+                                .setFilePath(filePath)
+                                .build();
+                this.localModel.put(modelName, localSource);
+                result.success(null);
             }
 
         } else if (call.method.equals("FirebaseModelInterpreter#run")) {
@@ -310,15 +332,15 @@ public class MlkitPlugin implements MethodCallHandler {
             String localModelName = call.argument("localModelName");
             try {
 
-                FirebaseModelOptions.Builder builder = new FirebaseModelOptions.Builder();
+                FirebaseModelInterpreterOptions.Builder builder = null;
 
                 if (remoteModelName != null) {
-                    builder.setRemoteModelName(remoteModelName);
+                    builder = new FirebaseModelInterpreterOptions.Builder(remoteModel.get(remoteModelName));
                 }
                 if (localModelName != null) {
-                    builder.setLocalModelName(localModelName);
+                    builder = new FirebaseModelInterpreterOptions.Builder(localModel.get(remoteModelName));
                 }
-                FirebaseModelOptions modelOptions = builder.build();
+                FirebaseModelInterpreterOptions modelOptions = builder.build();
                 FirebaseModelInputOutputOptions.Builder ioBuilder = new FirebaseModelInputOutputOptions.Builder();
                 FirebaseModelInputs.Builder inputsBuilder = new FirebaseModelInputs.Builder();
 
@@ -364,7 +386,7 @@ public class MlkitPlugin implements MethodCallHandler {
                     @Override
                     public void onFailure(@NonNull Exception e) {
                         e.printStackTrace();
-                        Log.e("FirebaseModelInterpreter", e.getMessage());
+                        Log.e("FBModelInterpreter", e.getMessage());
                         return;
                     }
                 }).continueWith(new Continuation<FirebaseModelOutputs, List<String>>() {
@@ -399,7 +421,8 @@ public class MlkitPlugin implements MethodCallHandler {
                             result.success(dataBuilder.build());
                         } catch (Exception e) {
                             e.printStackTrace();
-                            Log.e("FirebaseModelInterpreter", e.getMessage());
+                            Log.e("FBModelInterpreter", e.getMessage());
+                            result.error(e.getMessage(), null, null);
                         }
                         return null;
 

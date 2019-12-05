@@ -364,6 +364,19 @@ class FirebaseModelManager {
     }
     return null;
   }
+
+  Future<void> registerCustomLocalModelSource(
+      FirebaseCustomLocalModelSource localSource) async {
+    try {
+      await _channel.invokeMethod(
+          "FirebaseModelManager#registerCustomLocalModelSource",
+          {'source': localSource.asDictionary()});
+    } catch (e) {
+      print(
+          "Error on FirebaseModelManager#registerCustomLocalModelSource : ${e.toString()}");
+    }
+    return null;
+  }
 }
 
 // android
@@ -383,6 +396,18 @@ class FirebaseLocalModelSource {
 
   Map<String, dynamic> asDictionary() {
     return {"modelName": modelName, "assetFilePath": assetFilePath};
+  }
+}
+
+class FirebaseCustomLocalModelSource {
+  final String filePath;
+
+  FirebaseCustomLocalModelSource({
+    @required this.filePath,
+  });
+
+  Map<String, dynamic> asDictionary() {
+    return {"filePath": filePath};
   }
 }
 
