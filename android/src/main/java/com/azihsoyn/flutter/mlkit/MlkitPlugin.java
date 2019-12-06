@@ -338,7 +338,7 @@ public class MlkitPlugin implements MethodCallHandler {
                     builder = new FirebaseModelInterpreterOptions.Builder(remoteModel.get(remoteModelName));
                 }
                 if (localModelName != null) {
-                    builder = new FirebaseModelInterpreterOptions.Builder(localModel.get(remoteModelName));
+                    builder = new FirebaseModelInterpreterOptions.Builder(localModel.get(localModelName));
                 }
                 FirebaseModelInterpreterOptions modelOptions = builder.build();
                 FirebaseModelInputOutputOptions.Builder ioBuilder = new FirebaseModelInputOutputOptions.Builder();

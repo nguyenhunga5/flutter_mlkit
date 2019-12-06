@@ -400,14 +400,16 @@ class FirebaseLocalModelSource {
 }
 
 class FirebaseCustomLocalModelSource {
+  final String modelName;
   final String filePath;
 
   FirebaseCustomLocalModelSource({
+    @required this.modelName,
     @required this.filePath,
   });
 
   Map<String, dynamic> asDictionary() {
-    return {"filePath": filePath};
+    return {"modelName": modelName, "filePath": filePath};
   }
 }
 

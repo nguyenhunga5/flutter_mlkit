@@ -248,7 +248,20 @@ UIImage* imageFromImageSourceWithData(NSData *data) {
             NSString *fullpath = [@"Frameworks/App.framework/flutter_assets/" stringByAppendingString:assetFilePath];
             NSString *path = [[NSBundle mainBundle] pathForResource:fullpath ofType:nil];
             FIRCustomLocalModel *localModel = [[FIRCustomLocalModel alloc] initWithModelPath:path];
-            [remoteCustomModelMap setObject:localModel forKey:modeName];
+            [localCustomModelMap setObject:localModel forKey:modeName];
+            result(@YES);
+        } else {
+            result(@NO);
+        }
+    } else if ([call.method hasPrefix:@"FirebaseModelManager#registerCustomLocalModelSource"]) {
+        if(call.arguments[@"source"] != [NSNull null] ){
+            NSString *modeName = call.arguments[@"source"][@"modelName"];
+            NSString *filePath = call.arguments[@"source"][@"filePath"];
+            FIRCustomLocalModel *localModel = [[FIRCustomLocalModel alloc] initWithModelPath:filePath];
+            [localCustomModelMap setObject:localModel forKey:modeName];
+            result(@YES);
+        } else {
+            result(@NO);
         }
     } else if ([call.method hasPrefix:@"FirebaseModelInterpreter#run"]) {
         NSString *remoteModelName = nil;
@@ -333,7 +346,7 @@ UIImage* imageFromImageSourceWithData(NSData *data) {
                                 NSLog(@"Failed runWithInputs with error: %@", error.localizedDescription);
                                 return;
                             }
-                            __block NSMutableArray<NSObject *> *ret =[NSMutableArray array];
+                            NSMutableArray<NSObject *> *ret =[NSMutableArray array];
                             for (int i = 0; i < [outputOptions count]; i++)
                             {
                                 NSObject *outputArray = [outputs outputAtIndex:i error:&error];
